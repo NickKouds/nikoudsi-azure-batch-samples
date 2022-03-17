@@ -1,6 +1,10 @@
 import { BatchServiceClient, BatchSharedKeyCredentials } from "@azure/batch";
+import {BatchManagementClient} from "@azure/arm-batch";
+import { DefaultAzureCredential } from "@azure/identity";
 
-// Replace values below with Batch Account details 
+/*
+ * Create the Batch Service Client, this will be used to interface with jobs and tasks
+ */
 const batchAccountName = '<batch-account-name>';
 const batchAccountKey = '<batch-account-key>';
 const batchEndpoint = '<batch-account-url>';
@@ -11,9 +15,18 @@ const sh_url = "<startup prereq script SAS URI>";
 // Replace values with SAS URIs of the Python script file
 const scriptURI = "<python script SAS URI>";
 
-
 const credentials = new BatchSharedKeyCredentials(batchAccountName, batchAccountKey);
 const batchClient = new BatchServiceClient(credentials, batchEndpoint);
+
+
+/**
+ * Create the Batch Management Client, this will be used to interface with pools
+ */
+const resourceGroup = "<resource group name>";
+const accountName = "<batch account name>";
+const subscriptionId = "<subscription id>";
+const batchManagement = new BatchManagementClient(new DefaultAzureCredential(), subscriptionId);
+
 
 // Pool ID 
 const now = new Date();
@@ -22,43 +35,45 @@ const poolId = `processcsv_${now.getFullYear()}${now.getMonth()}${now.getDay()}$
 // Job ID 
 const jobId = "processcsvjob";
 
-// Pool VM Image Reference
-const imgRef = {
-    publisher: "Canonical",
-    offer: "UbuntuServer",
-    sku: "18.04-LTS",
-    version: "latest"
-}
-// Pool VM configuraion object
-const vmConfig = {
-    imageReference: imgRef,
-    nodeAgentSKUId: "batch.node.ubuntu 18.04"
-};
-// Number of VMs to create in a pool
-const numVms = 4;
-const vmSize = "STANDARD_D1_V2";
-// Pool configuration object
-const poolConfig = {
-    id: poolId,
-    displayName: "Processing csv files",
-    vmSize: vmSize,
-    virtualMachineConfiguration: vmConfig,
-    targetDedicatedNodes: numVms,
-    enableAutoScale: false
-};
+createPool();
 
-// Creating Batch Pool
-console.log("Creating pool with ID : " + poolId);
-const pool = batchClient.pool.add(poolConfig, function (error, result, request, response) {
-    if (error !== null) {
-        console.log("An error occured while creating the pool...");
-        console.log(error.response);
+async function createPool()
+{
+    // Pool VM Image Reference
+    const imgRef = {
+        publisher: "Canonical",
+        offer: "UbuntuServer",
+        sku: "18.04-LTS",
+        version: "latest"
     }
-    else {
-        // If there is no error then create the Batch Job        
-        createJob();
-    }
-});
+    // Pool VM configuraion object
+    const vmConfig = {
+        imageReference: imgRef,
+        nodeAgentSkuId: "batch.node.ubuntu 18.04"
+    };
+    // Number of VMs to create in a pool
+    const numVms = 4;
+    const vmSize = "STANDARD_D1_V2";
+    // Pool configuration object
+    const poolConfig = {
+        displayName: "Processing csv files",
+        vmSize: vmSize,
+        deploymentConfiguration: {
+            virtualMachineConfiguration: vmConfig
+        },
+        scaleSettings: {
+                    fixedScale: {
+                        targetDedicatedNodes: numVms
+                    }
+        }
+    };
+
+    // Creating Batch Pool
+    console.log("Creating pool with ID : " + poolId);
+    const poolResult = await batchManagement.poolOperations.create(resourceGroup,accountName,poolId,poolConfig);
+    createJob();
+}
+
 
 function createJob() {
     console.log("Creating job with ID : " + jobId);
