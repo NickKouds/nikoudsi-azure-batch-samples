@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "description": "Getting started sample in Node.js for deploying Azure batch jobs",
   "dependencies": {
-    "@azure/batch": "^8.0.0",
+    "@azure/arm-batch": "file:../../../azure-arm-batch-7.1.0/azure-arm-batch-7.1.0/azure-arm-batch-7.1.0.tgz",
+    "@azure/batch": "^10.1.0",
+    "@azure/identity": "^2.0.4",
     "@azure/ms-rest-nodeauth": "^3.0.6"
   },
   "main": "sample.js",
