@@ -1,13 +1,13 @@
 import { BatchServiceClient} from "@azure/batch";
 import { ClientSecretCredential} from "@azure/identity";
 import {BatchManagementClient} from "@azure/arm-batch";
-import { deleteJob, deleteDataPlanePool } from "./utilities/utils.js";
+import {getBlobServiceClient} from "./utilities/storage_client.js"
 
 
-const AZURE_CLIENT_SECRET = "HWF7Q~WBTl62N36iR0S4EGmfadrwlXgHLAnNo";
-const AZURE_CLIENT_ID = "effcc413-3c01-4f1d-983f-55166bd727c9";
-const AZURE_TENANT_ID= "72f988bf-86f1-41af-91ab-2d7cd011db47";
-const BATCH_ENDPOINT = "https://sdktest.westus.batch.azure.com";
+const AZURE_CLIENT_SECRET = "";
+const AZURE_CLIENT_ID = "";
+const AZURE_TENANT_ID= "";
+const BATCH_ENDPOINT = "";
 
 
 /**
@@ -26,17 +26,17 @@ const batchClient = new BatchServiceClient(credential, BATCH_ENDPOINT);
 /**
  * Create the Batch Management Client, this will be used to interface with pools
  */
- const resourceGroup = "nikoudsiSDKTest";
- const accountName = "sdktest";
- const subscriptionId = "65634139-3762-476b-946d-e221f4cdc2bf";
+ const resourceGroup = "";
+ const accountName = "";
+ const subscriptionId = "";
  const batchManagement = new BatchManagementClient(credential, subscriptionId);
 
 
 // Replace values with SAS URIs of the shell script file
-const sh_url = "https://batchsdktest.blob.core.windows.net/scripts/startup_prereq.sh?sv=2020-10-02&st=2022-03-21T20%3A20%3A20Z&se=2022-03-25T20%3A20%3A00Z&sr=b&sp=r&sig=kzFI22pTIrGGLHh14pAroY%2BD9rVJVETu%2FeRMVzxmJBI%3D";
+const sh_url = "";
 
 // Replace values with SAS URIs of the Python script file
-const scriptURI = "https://batchsdktest.blob.core.windows.net/scripts/processcsv.py?sv=2020-10-02&st=2022-03-21T20%3A19%3A14Z&se=2022-03-25T20%3A19%3A00Z&sr=b&sp=r&sig=ABeDvVPVSVaIzyeSwm5svCJKl%2FG9SD1P5LbZVgbZW%2FU%3D";
+const scriptURI = "";
 
 
 // Pool ID 
@@ -46,12 +46,13 @@ const poolId = `processcsv_${now.getFullYear()}${now.getMonth()}${now.getDay()}$
 // Job ID 
 const jobId = "processcsvjob";
 const taskIds = [];
+const containerList = ["con1", "con2", "con3", "con4"];      //Replace with list of blob containers within storage account
 
 
 async function provisionStorage() {
     //Link Storage account to Batch account
     const autoStorageProperties = {
-        storageAccountId: "/subscriptions/65634139-3762-476b-946d-e221f4cdc2bf/resourceGroups/nikoudsiSDKTest/providers/Microsoft.Storage/storageAccounts/batchsdktest"
+        storageAccountId: ""
     };
 
     const batchAccountUpdateParams = {
@@ -93,7 +94,17 @@ function createPool()
     // Creating Batch Pool
     console.log("Creating pool with ID : " + poolId);
     try {
-        const pool = batchClient.pool.add(poolConfig);
+        const pool = batchClient.pool.add(poolConfig, {onResponse: function (rawResponse, flatResponse, error) {
+            if (error != null)
+            {
+                console.log("An error occured while creating the pool...");
+                console.log(error);
+            }
+            else
+            {
+                createJob();
+            }
+        }});
     }
     catch (error) {
         console.log(error);
@@ -103,7 +114,7 @@ function createPool()
 }
 
 
-async function createJob() {
+function createJob() {
     console.log("Creating job with ID : " + jobId);
     // Preparation Task configuraion object    
     const jobPrepTaskConfig = {
@@ -131,8 +142,18 @@ async function createJob() {
 
     // Submitting Batch Job
     try {
-        const job =  await batchClient.job.add(jobConfig);
-        createTasks();
+        const job =  batchClient.job.add(jobConfig, {onResponse: function (rawResponse, flatResponse, error) {
+            if (error != null)
+            {
+                console.log("An error occured while creating the job...");
+                console.log(error);
+            }
+            else
+            {
+                createTasks();
+            }
+        }});
+        
     }
     catch (error) {
         console.log(error);
@@ -143,7 +164,6 @@ async function createJob() {
 
 async function createTasks() {
     console.log("Creating tasks....");
-    const containerList = ["con1", "con2", "con3", "con4"];      //Replace with list of blob containers within storage account
 
     for (let index = 0; index < containerList.length; index++)
     {
@@ -191,12 +211,17 @@ async function waitForTasksToComplete() {
         sleep(30000);
     }
 
-    cleanupResources();
+
+    //cleanupResources();
 
 }
 
-function deleteTasks()
-{
+function viewBlobOutput() {
+    blobServiceClient = getBlobServiceClient();
+    
+}
+
+function deleteTasks() {
     taskIds.forEach(function(val, index) {
         console.log("Deleting Task: " + val);
         const result = batchClient.task.delete(jobId, val);
@@ -204,18 +229,15 @@ function deleteTasks()
     
 }
 
-function initiateResources()
-{
-    provisionStorage();
-    // createPool();
-    // createJob();
+function initiateResources() {
+    //provisionStorage();
+     createPool();
 }
 
-function cleanupResources()
-{
+function cleanupResources() {
     deleteTasks();
-    deleteJob(batchClient, jobId);
-    deleteDataPlanePool(batchClient, poolId);
+    deleteJob(jobId);
+    deletePool(poolId);
 }
 
 function sleep(milliseconds) {
@@ -228,8 +250,19 @@ function sleep(milliseconds) {
         }
     }
   }
+
+function deletePool(poolId) {
+    console.log("Deleting Pool: " + poolId);
+    const result = batchClient.pool.delete(poolId);
+}
+
+function deleteJob(jobId) {
+    console.log("Deleting Job: " + jobId);
+    const result = batchClient.job.delete(jobId);
+}
   
 
 initiateResources();
+
 
 
