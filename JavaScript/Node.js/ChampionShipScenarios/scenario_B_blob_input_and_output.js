@@ -1,13 +1,13 @@
 import { BatchServiceClient} from "@azure/batch";
 import { ClientSecretCredential} from "@azure/identity";
 import {BatchManagementClient} from "@azure/arm-batch";
-import {getBlobServiceClient} from "./utilities/storage_client.js"
+import {StorageClient} from "./utilities/storage_client.js"
 
 
-const AZURE_CLIENT_SECRET = "";
-const AZURE_CLIENT_ID = "";
-const AZURE_TENANT_ID= "";
-const BATCH_ENDPOINT = "";
+const AZURE_CLIENT_SECRET = process.env["AZURE_CLIENT_SECRET"];
+const AZURE_CLIENT_ID = process.env["AZURE_CLIENT_ID"];
+const AZURE_TENANT_ID= process.env["AZURE_TENANT_ID"];
+const BATCH_ENDPOINT = process.env["AZURE_BATCH_ENDPOINT"];
 
 
 /**
@@ -26,10 +26,10 @@ const batchClient = new BatchServiceClient(credential, BATCH_ENDPOINT);
 /**
  * Create the Batch Management Client, this will be used to interface with pools
  */
- const resourceGroup = "";
- const accountName = "";
- const subscriptionId = "";
- const batchManagement = new BatchManagementClient(credential, subscriptionId);
+//  const resourceGroup = "";
+//  const accountName = "";
+//  const subscriptionId = "";
+//  const batchManagement = new BatchManagementClient(credential, subscriptionId);
 
 
 // Replace values with SAS URIs of the shell script file
@@ -45,7 +45,12 @@ const poolId = `processcsv_${now.getFullYear()}${now.getMonth()}${now.getDay()}$
 
 // Job ID 
 const jobId = "processcsvjob";
+
+//Task IDS
 const taskIds = [];
+
+//Storage Client
+const storageClient = new StorageClient("batchsdktest", credential);
 const containerList = ["con1", "con2", "con3", "con4"];      //Replace with list of blob containers within storage account
 
 
@@ -211,15 +216,11 @@ async function waitForTasksToComplete() {
         sleep(30000);
     }
 
-
-    //cleanupResources();
+    await storageClient.printBlobOutput(containerList);
+    cleanupResources();
 
 }
 
-function viewBlobOutput() {
-    blobServiceClient = getBlobServiceClient();
-    
-}
 
 function deleteTasks() {
     taskIds.forEach(function(val, index) {

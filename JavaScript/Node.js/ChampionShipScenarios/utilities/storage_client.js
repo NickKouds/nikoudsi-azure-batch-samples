@@ -1,56 +1,42 @@
-import { DefaultAzureCredential } from "@azure/identity";
+
 import { BlobServiceClient } from "@azure/storage-blob";
 
-// Enter your storage account name
-const account = "";
-const defaultAzureCredential = new DefaultAzureCredential();
 
+export class StorageClient {
+  constructor(storageAccountName, credential) {
+    this.blobServiceClient = new BlobServiceClient(`https://${storageAccountName}.blob.core.windows.net`, credential);
+  }
 
-export function getBlobServiceClient() {
-    return new BlobServiceClient(
-        `https://${account}.blob.core.windows.net`,
-        defaultAzureCredential
-      );
-}
+  async printBlobOutput(containerList) {
+    for(let index = 0; index < containerList.length; index++) {
+      var containerName = containerList[index];
+      console.log(`Printing blobs in ${containerName}`);
+      const containerClient = this.blobServiceClient.getContainerClient(containerName);
 
-async function main() {
-    const blobServiceClient = getBlobServiceClient();
-    let containerList = blobServiceClient.listContainers();
-    let containerItem = await containerList.next();
+      let i = 1;
+      let blobs = containerClient.listBlobsFlat();
+      for await (const blob of blobs) {
+          if (blob.name.startsWith("json/"))
+          {
+              console.log(`Blob ${i++}: ${blob.name}`);
+              const blobClient = containerClient.getBlobClient(blob.name);
 
-    while (!containerItem.done)
-    {
-        var containerName = containerItem.value.name;
-        console.log(`Listing blobs in ${containerName}`);
-        const containerClient = blobServiceClient.getContainerClient(containerName);
-
-        let i = 1;
-        let blobs = containerClient.listBlobsFlat();
-        for await (const blob of blobs) {
-            console.log(`Blob ${i++}: ${blob.name}`);
-
-            if (blob.name.startsWith("json/"))
-            {
-                const blobClient = containerClient.getBlobClient(blob.name);
-
-                // Get blob content from position 0 to the end
-                // In Node.js, get downloaded data by accessing downloadBlockBlobResponse.readableStreamBody
-                const downloadBlockBlobResponse = await blobClient.download();
-                const downloaded = (
-                    await streamToBuffer(downloadBlockBlobResponse.readableStreamBody)
-                ).toString();
-                console.log("Downloaded blob content:", downloaded);
-            }
-        }
-
-        containerItem = await containerList.next();
+              // Get blob content from position 0 to the end
+              // In Node.js, get downloaded data by accessing downloadBlockBlobResponse.readableStreamBody
+              const downloadBlockBlobResponse = await blobClient.download();
+              const downloaded = (
+                  await this.streamToBuffer(downloadBlockBlobResponse.readableStreamBody)
+              ).toString();
+              console.log("Downloaded blob content:", downloaded);
+          }
+      }
     }
-    
+
   }
 
 
   // [Node.js only] A helper method used to read a Node.js readable stream into a Buffer
-  async function streamToBuffer(readableStream) {
+  async streamToBuffer(readableStream) {
     return new Promise((resolve, reject) => {
       const chunks = [];
       readableStream.on("data", (data) => {
@@ -63,8 +49,9 @@ async function main() {
     });
   }
 
+}
 
-  
-main();
+
+
 
 
