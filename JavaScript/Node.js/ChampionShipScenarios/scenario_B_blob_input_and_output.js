@@ -69,7 +69,7 @@ async function provisionStorage() {
     console.log(result.autoStorage.storageAccountId == autoStorageProperties.storageAccountId);
 }
 
-function createPool()
+async function createPool()
 {
     // Pool VM Image Reference
     const imgRef = {
@@ -99,7 +99,7 @@ function createPool()
     // Creating Batch Pool
     console.log("Creating pool with ID : " + poolId);
     try {
-        const pool = batchClient.pool.add(poolConfig, {onResponse: function (rawResponse, flatResponse, error) {
+        const pool = await batchClient.pool.add(poolConfig, {onResponse: function (rawResponse, flatResponse, error) {
             if (error != null)
             {
                 console.log("An error occured while creating the pool...");
@@ -107,7 +107,7 @@ function createPool()
             }
             else
             {
-                createJob();
+                console.log("Pool was successfully created!");
             }
         }});
     }
@@ -119,7 +119,7 @@ function createPool()
 }
 
 
-function createJob() {
+async function createJob() {
     console.log("Creating job with ID : " + jobId);
     // Preparation Task configuraion object    
     const jobPrepTaskConfig = {
@@ -147,7 +147,7 @@ function createJob() {
 
     // Submitting Batch Job
     try {
-        const job =  batchClient.job.add(jobConfig, {onResponse: function (rawResponse, flatResponse, error) {
+        const job =  await batchClient.job.add(jobConfig, {onResponse: function (rawResponse, flatResponse, error) {
             if (error != null)
             {
                 console.log("An error occured while creating the job...");
@@ -155,7 +155,7 @@ function createJob() {
             }
             else
             {
-                createTasks();
+                console.log("Job was successfully created!");
             }
         }});
         
@@ -169,7 +169,7 @@ function createJob() {
 
 async function createTasks() {
     console.log("Creating tasks....");
-
+    let tasksPromises = [];
     for (let index = 0; index < containerList.length; index++)
     {
         const containerName = containerList[index];
@@ -183,11 +183,11 @@ async function createTasks() {
             resourceFiles: [{ 'httpUrl': scriptURI, 'filePath': 'processcsv.py' }]
         };
 
-        const task = await batchClient.task.add(jobId, taskConfig);
+        const task = batchClient.task.add(jobId, taskConfig);
+        tasksPromises.push(task);
         taskIds.push(taskID);
     }
-
-    waitForTasksToComplete();
+    await Promise.all(tasksPromises);
 
 }
 
@@ -199,7 +199,7 @@ async function waitForTasksToComplete() {
 
         for (let index = 0; index < taskIds.length; index++) {
             var taskId = taskIds[index];
-            var taskResult = await batchClient.task.get(jobId, taskId);
+            var taskResult = batchClient.task.get(jobId, taskId);
 
             if (taskResult.state != "completed") {
                 console.log("Task " + taskId + " is not complete yet!");
@@ -216,9 +216,6 @@ async function waitForTasksToComplete() {
         sleep(30000);
     }
 
-    await storageClient.printBlobOutput(containerList);
-    cleanupResources();
-
 }
 
 
@@ -230,9 +227,13 @@ function deleteTasks() {
     
 }
 
-function initiateResources() {
+async function initiateResources() {
     //provisionStorage();
-     createPool();
+     await createPool();
+     await createJob();
+     await createTasks();
+     await waitForTasksToComplete();
+     await storageClient.printBlobOutput(containerList);
 }
 
 function cleanupResources() {
@@ -263,7 +264,8 @@ function deleteJob(jobId) {
 }
   
 
-initiateResources();
+await initiateResources();
+cleanupResources();
 
 
 
