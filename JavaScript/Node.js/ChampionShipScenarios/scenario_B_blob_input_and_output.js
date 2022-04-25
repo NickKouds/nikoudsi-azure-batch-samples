@@ -2,12 +2,11 @@ import { BatchServiceClient} from "@azure/batch";
 import { ClientSecretCredential} from "@azure/identity";
 import {BatchManagementClient} from "@azure/arm-batch";
 import {StorageClient} from "./utilities/storage_client.js"
-
+import {createClient} from "./utilities/batch_client.js";
 
 const AZURE_CLIENT_SECRET = process.env["AZURE_CLIENT_SECRET"];
 const AZURE_CLIENT_ID = process.env["AZURE_CLIENT_ID"];
 const AZURE_TENANT_ID= process.env["AZURE_TENANT_ID"];
-const BATCH_ENDPOINT = process.env["AZURE_BATCH_ENDPOINT"];
 
 
 /**
@@ -21,7 +20,7 @@ const credential = new ClientSecretCredential(
   );
 
 
-const batchClient = new BatchServiceClient(credential, BATCH_ENDPOINT);
+const batchClient = createClient("APIKey");
 
 /**
  * Create the Batch Management Client, this will be used to interface with pools
@@ -33,10 +32,10 @@ const batchClient = new BatchServiceClient(credential, BATCH_ENDPOINT);
 
 
 // Replace values with SAS URIs of the shell script file
-const sh_url = "";
+const sh_url = "https://batchsdktest.blob.core.windows.net/scripts/startup_prereq.sh?sv=2020-10-02&st=2022-04-21T18%3A07%3A09Z&se=2022-04-25T18%3A07%3A00Z&sr=b&sp=r&sig=KrDdXlKKTW6mqfQORnCIyob7mjtcwuAJz1BJF5oA17w%3D";
 
 // Replace values with SAS URIs of the Python script file
-const scriptURI = "";
+const scriptURI = "https://batchsdktest.blob.core.windows.net/scripts/processcsv.py?sv=2020-10-02&st=2022-04-21T18%3A06%3A37Z&se=2022-04-25T18%3A06%3A00Z&sr=b&sp=r&sig=5%2FIbdI24iqnSYa7JBNdlk7oJWwB%2F7X00%2BgZ4eUA4LPY%3D";
 
 
 // Pool ID 
@@ -187,7 +186,7 @@ async function createTasks() {
         tasksPromises.push(task);
         taskIds.push(taskID);
     }
-    await Promise.all(tasksPromises);
+    return Promise.all(tasksPromises);
 
 }
 
@@ -199,7 +198,7 @@ async function waitForTasksToComplete() {
 
         for (let index = 0; index < taskIds.length; index++) {
             var taskId = taskIds[index];
-            var taskResult = batchClient.task.get(jobId, taskId);
+            var taskResult = await batchClient.task.get(jobId, taskId);
 
             if (taskResult.state != "completed") {
                 console.log("Task " + taskId + " is not complete yet!");
@@ -219,16 +218,19 @@ async function waitForTasksToComplete() {
 }
 
 
-function deleteTasks() {
-    taskIds.forEach(function(val, index) {
-        console.log("Deleting Task: " + val);
-        const result = batchClient.task.delete(jobId, val);
-    })
+async function deleteTasks() {
+        var taskPromises = [];
+         taskIds.forEach(function(val, index) {
+            console.log("Deleting Task: " + val);
+            const resultProm = batchClient.task.delete(jobId, val);
+            taskPromises.push(resultProm);
+         })
     
-}
+        return Promise.all(taskPromises);
+         
+     }
 
 async function initiateResources() {
-    //provisionStorage();
      await createPool();
      await createJob();
      await createTasks();
@@ -236,8 +238,9 @@ async function initiateResources() {
      await storageClient.printBlobOutput(containerList);
 }
 
-function cleanupResources() {
-    deleteTasks();
+async function cleanupResources() {
+    storageClient.deleteBlobOutput(containerList);
+    await deleteTasks();
     deleteJob(jobId);
     deletePool(poolId);
 }

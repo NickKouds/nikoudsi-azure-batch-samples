@@ -49,6 +49,25 @@ export class StorageClient {
     });
   }
 
+    async deleteBlobOutput(containerList) {
+        for(let index = 0; index < containerList.length; index++) {
+          var containerName = containerList[index];
+          console.log(`Deleting blobs in Container ${containerName}`);
+          const containerClient = this.blobServiceClient.getContainerClient(containerName);
+    
+          let blobs = containerClient.listBlobsFlat();
+          for await (const blob of blobs) {
+              if (blob.name.startsWith("json/"))
+              {
+                  const blobClient = containerClient.getBlobClient(blob.name);
+                  console.log(`Deleting blob ${blob.name}`);
+                  blobClient.delete();
+              }
+          }
+        }
+      }
+    
+
 }
 
 
