@@ -5,7 +5,7 @@
   "description": "Getting started sample in Node.js for deploying Azure batch jobs",
   "dependencies": {
     "@azure/arm-batch": "7.1.0",
-    "@azure/batch": "file:../../../azure-batch-client-exposed-11.0.0-beta.1.tgz",
+    "@azure/batch": "file:../../../azure-batch-11.0.0-beta.1.tgz",
     "@azure/identity": "^2.0.1",
     "@azure/storage-blob": "^12.9.0",
     "prompt": "^1.2.2"
